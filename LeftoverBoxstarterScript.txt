@@ -1,0 +1,98 @@
+#Setup Windows options
+Set-WindowsExplorerOptions -EnableShowHiddenFilesFoldersDrives -EnableShowProtectedOSFiles -EnableShowFileExtensions
+Enable-RemoteDesktop
+Disable-UAC
+Update-ExecutionPolicy Unrestricted
+
+#Store username for later use 
+#Otherwise chocolately will change it to SYSTEM - https://github.com/chocolatey/chocolatey/issues/475
+$user = "$env:USERDOMAIN\$env:USERNAME"
+
+
+#Install internal apps
+#LegacyComponentsInstall replaces need to run the old Prepare-Developer.ps1 script
+cinst -y LegacyComponentsInstall -Version 1.0.0 -Source http://nuget.build.d2l/nuget/stable
+
+#Refresh the PATH to use GIT later on
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
+
+#Enables distributed transaction coordinator for transaction scopes while testing
+sc.exe config MSDTC start= delayed-auto
+sc.exe start MSDTC
+
+#Configure git
+git config --global user.email ([adsi]"LDAP://$(whoami /fqdn)").mail
+git config --global user.name ([adsi]"LDAP://$(whoami /fqdn)").fullName
+git config --global core.preloadindex true
+git config --global core.fscache true
+
+#IIS setup
+#from https://git.dev.d2l/projects/PPT/repos/d2l/browse/manifests/server/features.pp:
+cinst -y NetFx3 -source windowsfeatures 
+cinst -y WAS-WindowsActivationService -source windowsfeatures 
+cinst -y WAS-ConfigurationAPI -source windowsfeatures 
+cinst -y WAS-NetFxEnvironment -source windowsfeatures 
+cinst -y WAS-ProcessModel -source windowsfeatures 
+#from https://git.dev.d2l/projects/PPT/repos/d2l/browse/manifests/server/iisfeatures.pp:
+cinst -y IIS-WebServerRole -source windowsfeatures 
+cinst -y IIS-WebServer -source windowsfeatures 
+cinst -y IIS-ApplicationDevelopment -source windowsfeatures 
+cinst -y IIS-NetFxExtensibility -source windowsfeatures 
+cinst -y IIS-ASP -source windowsfeatures 
+cinst -y IIS-ISAPIExtensions -source windowsfeatures 
+cinst -y IIS-ISAPIFilter -source windowsfeatures 
+cinst -y IIS-ASPNET -source windowsfeatures 
+cinst -y IIS-ServerSideIncludes -source windowsfeatures 
+cinst -y IIS-CommonHttpFeatures -source windowsfeatures 
+cinst -y IIS-DefaultDocument -source windowsfeatures 
+cinst -y IIS-DirectoryBrowsing -source windowsfeatures 
+cinst -y IIS-HttpErrors -source windowsfeatures 
+cinst -y IIS-StaticContent -source windowsfeatures 
+cinst -y IIS-WebDAV -source windowsfeatures 
+cinst -y IIS-HealthAndDiagnostics -source windowsfeatures 
+cinst -y IIS-CustomLogging -source windowsfeatures 
+cinst -y IIS-HttpLogging -source windowsfeatures 
+cinst -y IIS-RequestMonitor -source windowsfeatures 
+cinst -y IIS-HttpTracing -source windowsfeatures 
+cinst -y IIS-Performance -source windowsfeatures 
+cinst -y IIS-HttpCompressionDynamic -source windowsfeatures 
+cinst -y IIS-HttpCompressionStatic -source windowsfeatures 
+cinst -y IIS-Security -source windowsfeatures 
+cinst -y IIS-BasicAuthentication -source windowsfeatures 
+cinst -y IIS-ClientCertificateMappingAuthentication -source windowsfeatures 
+cinst -y IIS-DigestAuthentication -source windowsfeatures 
+cinst -y IIS-IISCertificateMappingAuthentication -source windowsfeatures 
+cinst -y IIS-IPSecurity -source windowsfeatures 
+cinst -y IIS-RequestFiltering -source windowsfeatures 
+cinst -y IIS-URLAuthorization -source windowsfeatures 
+cinst -y IIS-WindowsAuthentication -source windowsfeatures 
+cinst -y IIS-WebServerManagementTools -source windowsfeatures 
+cinst -y IIS-IIS6ManagementCompatibility -source windowsfeatures 
+cinst -y IIS-ManagementScriptingTools -source windowsfeatures 
+cinst -y IIS-WMICompatibility -source windowsfeatures 
+cinst -y IIS-Metabase -source windowsfeatures 
+cinst -y IIS-ManagementConsole -source windowsfeatures 
+cinst -y IIS-ManagementService -source windowsfeatures 
+cinst -y IIS-LoggingLibraries -source windowsfeatures 
+cinst -y IIS-ODBCLogging -source windowsfeatures 
+cinst -y IIS-LegacyScripts -source windowsfeatures 
+cinst -y IIS-LegacySnapIn -source windowsfeatures
+#Specific to Windows 8.1
+cinst -y IIS-NetFxExtensibility45 -source windowsfeatures
+cinst -y IIS-ASPNET45 -source windowsfeatures
+
+#Create the dev portal login pages
+$devportalPath="C:\inetpub\wwwroot"
+if(Test-Path $devportalPath){
+  Remove-Item -Recurse -Force $devportalPath
+}
+$env:GIT_SSL_NO_VERIFY="true"
+git clone --quiet https://git.dev.d2l/scm/dev/devportal.git $devportalPath | out-null
+
+#Give default application pool access to localsystem
+Import-Module WebAdministration
+Set-ItemProperty IIS:\AppPools\DefaultAppPool -Name  processModel -Value @{IdentityType=0}
+
+#Open IT apps page for additional licensed software
+#Would be nice to figure out how to script SCCM installs
+start "http://ktvcamn-sccm-01.desire2learn.d2l/CMApplicationCatalog/default.aspx#/SoftwareLibrary/AppListPageView.xaml"
