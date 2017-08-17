@@ -8,11 +8,6 @@ Update-ExecutionPolicy Unrestricted
 #Otherwise chocolately will change it to SYSTEM - https://github.com/chocolatey/chocolatey/issues/475
 $user = "$env:USERDOMAIN\$env:USERNAME"
 
-
-#Install internal apps
-#LegacyComponentsInstall replaces need to run the old Prepare-Developer.ps1 script
-cinst -y LegacyComponentsInstall -Version 1.0.0 -Source http://nuget.build.d2l/nuget/stable
-
 #Refresh the PATH to use GIT later on
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
 
